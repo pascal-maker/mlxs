@@ -111,3 +111,4 @@ mx.save_safetensors("./8bit/kokoro-v1_0.safetensors", weights, metadata={"format
 - Thanks to the Apple MLX team for providing a great framework for building TTS and STS models.
 - This project uses the Kokoro model architecture for text-to-speech synthesis.
 # mlx
+# mlxs
