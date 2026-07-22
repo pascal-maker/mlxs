@@ -2,13 +2,23 @@ import logging
 import re
 from dataclasses import dataclass
 from numbers import Number
+from pathlib import Path
 from typing import Any, Generator, List, Optional, Tuple, Union
 
 import mlx.core as mx
 import mlx.nn as nn
 import torch
 from huggingface_hub import hf_hub_download
-from misaki import en, espeak
+from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+if not hasattr(EspeakWrapper, "set_data_path"):
+
+    def _set_espeak_data_path(cls, data_path: str):
+        cls._ESPEAK_DATA_PATH = data_path
+
+    EspeakWrapper.set_data_path = classmethod(_set_espeak_data_path)
+
+from misaki import en
 
 ALIASES = {
     "en-us": "a",
@@ -37,6 +47,34 @@ LANG_CODES = dict(
     # pip install misaki[zh]
     z="Mandarin Chinese",
 )
+
+
+def _espeak_data_is_available() -> bool:
+    try:
+        import espeakng_loader
+
+        return (Path(espeakng_loader.get_data_path()) / "phontab").exists()
+    except Exception:
+        return False
+
+
+def _load_espeak_module():
+    from misaki import espeak
+
+    return espeak
+
+
+def _load_espeak_fallback(british: bool):
+    if not _espeak_data_is_available():
+        logging.warning("EspeakFallback not enabled: espeak-ng data is unavailable")
+        return None
+
+    try:
+        return _load_espeak_module().EspeakFallback(british=british)
+    except Exception as e:
+        logging.warning("EspeakFallback not enabled: OOD words will be skipped")
+        logging.warning({str(e)})
+        return None
 
 
 class KokoroPipeline:
@@ -89,17 +127,19 @@ class KokoroPipeline:
             raise ValueError("repo_id is required to load voices")
         self.model = model
         self.voices = {}
-        if lang_code in "ab":
-            try:
-                fallback = espeak.EspeakFallback(british=lang_code == "b")
-            except Exception as e:
-                logging.warning("EspeakFallback not Enabled: OOD words will be skipped")
-                logging.warning({str(e)})
-                fallback = None
+        self.trf = trf
+        self.g2p = None
+
+    def _ensure_g2p(self):
+        if self.g2p is not None:
+            return self.g2p
+
+        if self.lang_code in "ab":
+            fallback = _load_espeak_fallback(british=self.lang_code == "b")
             self.g2p = en.G2P(
-                trf=trf, british=lang_code == "b", fallback=fallback, unk=""
+                trf=self.trf, british=self.lang_code == "b", fallback=fallback, unk=""
             )
-        elif lang_code == "j":
+        elif self.lang_code == "j":
             try:
                 from misaki import ja
 
@@ -109,7 +149,7 @@ class KokoroPipeline:
                     "You need to `pip install misaki[ja]` to use lang_code='j'"
                 )
                 raise
-        elif lang_code == "z":
+        elif self.lang_code == "z":
             try:
                 from misaki import zh
 
@@ -120,11 +160,14 @@ class KokoroPipeline:
                 )
                 raise
         else:
-            language = LANG_CODES[lang_code]
+            language = LANG_CODES[self.lang_code]
             logging.warning(
                 f"Using EspeakG2P(language='{language}'). Chunking logic not yet implemented, so long texts may be truncated unless you split them with '\\n'."
             )
-            self.g2p = espeak.EspeakG2P(language=language)
+            if not _espeak_data_is_available():
+                raise RuntimeError("espeak-ng data is required for this language")
+            self.g2p = _load_espeak_module().EspeakG2P(language=language)
+        return self.g2p
 
     def load_single_voice(self, voice: str):
         if voice in self.voices:
@@ -377,7 +420,7 @@ class KokoroPipeline:
             # English processing (unchanged)
             if self.lang_code in "ab":
                 # print(f"Processing English text: {graphemes[:50]}{'...' if len(graphemes) > 50 else ''}")
-                _, tokens = self.g2p(graphemes)
+                _, tokens = self._ensure_g2p()(graphemes)
                 for gs, ps, tks in self.en_tokenize(tokens):
                     if not ps:
                         continue
@@ -440,7 +483,7 @@ class KokoroPipeline:
                     if not chunk.strip():
                         continue
 
-                    ps, _ = self.g2p(chunk)
+                    ps, _ = self._ensure_g2p()(chunk)
                     if not ps:
                         continue
                     elif len(ps) > 510:
