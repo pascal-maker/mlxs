@@ -2,6 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from numbers import Number
+from pathlib import Path
 from typing import Any, Generator, List, Optional, Tuple, Union
 
 import mlx.core as mx
@@ -17,7 +18,7 @@ if not hasattr(EspeakWrapper, "set_data_path"):
 
     EspeakWrapper.set_data_path = classmethod(_set_espeak_data_path)
 
-from misaki import en, espeak
+from misaki import en
 
 ALIASES = {
     "en-us": "a",
@@ -46,6 +47,34 @@ LANG_CODES = dict(
     # pip install misaki[zh]
     z="Mandarin Chinese",
 )
+
+
+def _espeak_data_is_available() -> bool:
+    try:
+        import espeakng_loader
+
+        return (Path(espeakng_loader.get_data_path()) / "phontab").exists()
+    except Exception:
+        return False
+
+
+def _load_espeak_module():
+    from misaki import espeak
+
+    return espeak
+
+
+def _load_espeak_fallback(british: bool):
+    if not _espeak_data_is_available():
+        logging.warning("EspeakFallback not enabled: espeak-ng data is unavailable")
+        return None
+
+    try:
+        return _load_espeak_module().EspeakFallback(british=british)
+    except Exception as e:
+        logging.warning("EspeakFallback not enabled: OOD words will be skipped")
+        logging.warning({str(e)})
+        return None
 
 
 class KokoroPipeline:
@@ -99,12 +128,7 @@ class KokoroPipeline:
         self.model = model
         self.voices = {}
         if lang_code in "ab":
-            try:
-                fallback = espeak.EspeakFallback(british=lang_code == "b")
-            except Exception as e:
-                logging.warning("EspeakFallback not Enabled: OOD words will be skipped")
-                logging.warning({str(e)})
-                fallback = None
+            fallback = _load_espeak_fallback(british=lang_code == "b")
             self.g2p = en.G2P(
                 trf=trf, british=lang_code == "b", fallback=fallback, unk=""
             )
@@ -133,7 +157,9 @@ class KokoroPipeline:
             logging.warning(
                 f"Using EspeakG2P(language='{language}'). Chunking logic not yet implemented, so long texts may be truncated unless you split them with '\\n'."
             )
-            self.g2p = espeak.EspeakG2P(language=language)
+            if not _espeak_data_is_available():
+                raise RuntimeError("espeak-ng data is required for this language")
+            self.g2p = _load_espeak_module().EspeakG2P(language=language)
 
     def load_single_voice(self, voice: str):
         if voice in self.voices:
