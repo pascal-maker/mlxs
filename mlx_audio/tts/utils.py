@@ -8,8 +8,9 @@ from typing import Any, Dict, Tuple, Union
 
 import mlx.core as mx
 import mlx.nn as nn
+from huggingface_hub import snapshot_download
 from mlx.utils import tree_flatten, tree_unflatten
-from mlx_lm.utils import get_model_path, load_config, make_shards
+from mlx_lm.utils import load_config
 
 MODEL_REMAPPING = {}
 MAX_FILE_SIZE_GB = 5
@@ -83,7 +84,18 @@ def quantize_model(
     return quantized_weights, quantized_config
 
 
-def load_model(model_path: Path, lazy: bool = False, **kwargs) -> nn.Module:
+def resolve_model_path(model_path: Union[str, Path]) -> Path:
+    path = Path(model_path)
+    if path.exists():
+        return path
+
+    if isinstance(model_path, str):
+        return Path(snapshot_download(repo_id=model_path))
+
+    return path
+
+
+def load_model(model_path: Union[str, Path], lazy: bool = False, **kwargs) -> nn.Module:
     """
     Load and initialize the model from a given path.
 
@@ -103,7 +115,7 @@ def load_model(model_path: Path, lazy: bool = False, **kwargs) -> nn.Module:
     name = None
     if isinstance(model_path, str):
         name = model_path.split("/")[-1].split("-")[0].lower()
-        model_path = get_model_path(model_path)
+    model_path = resolve_model_path(model_path)
     config = load_config(model_path, **kwargs)
 
     model_type = config.get("model_type", name)
