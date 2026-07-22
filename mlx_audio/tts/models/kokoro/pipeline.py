@@ -8,6 +8,15 @@ import mlx.core as mx
 import mlx.nn as nn
 import torch
 from huggingface_hub import hf_hub_download
+from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+if not hasattr(EspeakWrapper, "set_data_path"):
+
+    def _set_espeak_data_path(cls, data_path: str):
+        cls._ESPEAK_DATA_PATH = data_path
+
+    EspeakWrapper.set_data_path = classmethod(_set_espeak_data_path)
+
 from misaki import en, espeak
 
 ALIASES = {
