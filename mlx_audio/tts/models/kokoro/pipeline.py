@@ -81,7 +81,8 @@ class KokoroPipeline:
         """
         lang_code = lang_code.lower()
         lang_code = ALIASES.get(lang_code, lang_code)
-        assert lang_code in LANG_CODES, (lang_code, LANG_CODES)
+        if lang_code not in LANG_CODES:
+            raise ValueError(f"Unsupported lang_code: {lang_code!r}")
         self.lang_code = lang_code
         self.repo_id = repo_id
         if repo_id is None:

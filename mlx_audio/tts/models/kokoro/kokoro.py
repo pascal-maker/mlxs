@@ -118,10 +118,10 @@ class Model(nn.Module):
         input_ids = list(
             filter(lambda i: i is not None, map(lambda p: self.vocab.get(p), phonemes))
         )
-        assert len(input_ids) + 2 <= self.context_length, (
-            len(input_ids) + 2,
-            self.context_length,
-        )
+        if len(input_ids) + 2 > self.context_length:
+            raise ValueError(
+                f"Input sequence is too long: {len(input_ids) + 2} > {self.context_length}"
+            )
         input_ids = mx.array([[0, *input_ids, 0]])
         input_lengths = mx.array([input_ids.shape[-1]])
         text_mask = mx.arange(int(input_lengths.max()))[None, ...]
@@ -264,7 +264,8 @@ class Model(nn.Module):
             segment_time = time.time() - start_time
 
             samples = audio.shape[0] if audio is not None else 0
-            assert samples > 0, "No audio generated"
+            if samples <= 0:
+                raise RuntimeError("No audio generated")
 
             # Calculate token count
             token_count = len(phonemes) if phonemes is not None else 0
