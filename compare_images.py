@@ -1,7 +1,8 @@
 import mlx.core as mx
-from mlx_vlm import load, generate
+from mlx_vlm import generate, load
 from mlx_vlm.prompt_utils import apply_chat_template
 from mlx_vlm.utils import load_config
+
 
 def compare_images():
     # Load the model
@@ -22,6 +23,7 @@ def compare_images():
     output = generate(model, processor, formatted_prompt, images, verbose=False)
     print("Image Comparison:")
     print(output)
+
 
 if __name__ == "__main__":
     compare_images()

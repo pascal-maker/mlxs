@@ -1,7 +1,8 @@
 import mlx.core as mx
-from mlx_vlm import load, generate
+from mlx_vlm import generate, load
 from mlx_vlm.prompt_utils import apply_chat_template
 from mlx_vlm.utils import load_config
+
 
 def describe_image():
     # Load the model
@@ -22,6 +23,7 @@ def describe_image():
     output = generate(model, processor, formatted_prompt, image, verbose=False)
     print("Image Description:")
     print(output)
+
 
 if __name__ == "__main__":
     describe_image()
