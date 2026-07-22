@@ -1,5 +1,5 @@
 import mlx.core as mx
-from mlx_vlm import load, generate
+from mlx_vlm import generate, load
 from mlx_vlm.prompt_utils import apply_chat_template
 from mlx_vlm.utils import load_config
 
@@ -13,9 +13,7 @@ image = ["womenholdingateapot.jpg"]
 prompt = "Describe this image."
 
 # Apply chat template
-formatted_prompt = apply_chat_template(
-    processor, config, prompt, num_images=len(image)
-)
+formatted_prompt = apply_chat_template(processor, config, prompt, num_images=len(image))
 
 # Generate output
 output = generate(model, processor, formatted_prompt, image, verbose=False)
