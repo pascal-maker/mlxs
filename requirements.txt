@@ -7,11 +7,14 @@ espeakng-loader>=0.2.4
 mlx==0.29.4
 mlx-vlm>=0.1.14
 mlx-lm>=0.21.5
-numpy>=1.26.4
+numpy>=2.5.3
 torch==2.13.0
-transformers>=4.50.0
+transformers>=5.13.0
 sentencepiece>=0.2.0
-huggingface_hub>=0.27.0
-requests>=2.32.4
+huggingface_hub>=1.32.0
+requests>=2.34.0
 sounddevice>=0.5.1
 soundfile>=0.13.1
+# Security floors for packages that come in through the ones above (Aikido findings, 2026-11).
+scipy>=1.18.1
+tomlkit>=0.15.1
